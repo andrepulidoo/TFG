@@ -1,0 +1,32 @@
+import yfinance as yf
+import pandas as pd
+
+# -------------------------------
+empresas = {
+    'MSFT': 'Microsoft',
+    'GOOG': 'Google',
+    'META': 'Meta',
+    'AMZN': 'Amazon',
+    '^NDX': 'NASDAQ_100'
+}
+
+inicio = "2020-01-01"
+fin = "2025-12-31"
+
+# -------------------------------
+# Descargar y guardar datos 
+# -------------------------------
+for ticker, nombre in empresas.items():
+    data = yf.download(ticker, start=inicio, end=fin)
+
+    if data.empty:
+        print(f"No se pudieron descargar datos de {nombre}")
+        continue
+
+    data.to_csv(f"prices_{nombre.lower()}.csv",
+    sep=';',
+    decimal=','
+)
+    print(f"Datos de {nombre} guardados como prices_{nombre.lower()}.csv")
+
+print("\n Descarga individual completada.\n")
