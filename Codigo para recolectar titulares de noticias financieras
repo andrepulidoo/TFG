@@ -1,0 +1,53 @@
+import pandas as pd
+from pygooglenews import GoogleNews
+import datetime
+gn = GoogleNews()
+
+def get_news(search):
+    stories = []
+    start_date = datetime.date(2020,1,1)
+    end_date = datetime.date(2026,1,1)
+    delta = datetime.timedelta(days=30)
+
+    date_list = pd.date_range(start_date, end_date).tolist()
+
+    for date in date_list[:-1:30]:
+        result = gn.search(
+            search,
+            from_=date.strftime('%Y-%m-%d'),
+            to_=(date+delta).strftime('%Y-%m-%d')
+        )
+
+        newsitem = result['entries']
+
+        for item in newsitem:
+            story = {
+                'title': item.title,
+                'published': datetime.datetime.strptime(
+                    item.published,
+                    '%a, %d %b %Y %X GMT'
+                )
+            }
+            stories.append(story)
+
+    return stories
+
+
+
+df = pd.DataFrame(get_news('Microsoft OR MSFT'))
+df.to_csv('noticias_microsoft.csv', index=False)
+
+df1 = pd.DataFrame(get_news('Meta OR META'))
+df1.to_csv('noticias_meta.csv', index=False)
+
+df2 = pd.DataFrame(get_news('Google OR GOOG'))
+df2.to_csv('noticias_google.csv', index=False)
+
+df3 = pd.DataFrame(get_news('Amazon OR AMZN'))
+df3.to_csv('noticias_amazon.csv', index=False)
+
+df4 = pd.DataFrame(get_news('OpenAI OR AI'))
+df4.to_csv('noticias_AI.csv', index=False)
+
+df5 = pd.DataFrame(get_news('LLM OR Large Language Model'))
+df5.to_csv('noticias_LLM.csv', index=False)
