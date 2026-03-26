@@ -1,0 +1,149 @@
+import pandas as pd
+
+ruta = r'C:\Users\andre\OneDrive\Documentos\TFG\titulares_noticias.csv'
+
+df = pd.read_csv(
+    ruta,
+    sep=';',
+    encoding='latin1',
+    header=None
+)
+
+# poner nombres de columnas
+df.columns = ['title', 'published']
+
+
+# Extraer la fuente
+
+def extraer_fuente(title):
+    partes = title.rsplit(' - ', 1)
+    
+    if len(partes) == 2:
+        titulo, fuente = partes
+        return titulo.strip(), fuente.strip()
+    else:
+        return title.strip(), None
+    
+df[['title', 'source']] = df['title'].apply(
+    lambda x: pd.Series(extraer_fuente(x))
+)
+
+
+
+# Convertir la fecha
+df['published'] = pd.to_datetime(df['published'], dayfirst=True, errors='coerce')
+
+# quedanos solo hasta 31/12/2025
+df = df[df['published'] < '2026-01-01']
+ 
+# Eliminar duplicados
+df = df.drop_duplicates(subset=['title', 'published'])
+
+
+# limpiar caracteres raros
+df['title'] = df['title'].str.replace('', "'", regex=False)
+
+# quitar espacios
+df['title'] = df['title'].str.strip()
+
+# crear versión limpia en minúsculas
+df['title_clean'] = df['title'].str.lower()
+
+# eliminar filas sin fecha o sin título
+df = df.dropna(subset=['title', 'published']).reset_index(drop=True)
+
+# Filtrar noticias relevantes
+def es_relevante(texto):
+    texto = texto.lower()
+    palabras_clave = [
+        'microsoft', 'msft',
+        'google', 'goog', 'alphabet',
+        'amazon', 'amzn',
+        'meta ', 'facebook',
+        'openai', 'chatgpt', 'gpt',
+        'llm', 'large language model',
+        'artificial intelligence', 'ai'
+    ]
+    return any(palabra in texto for palabra in palabras_clave)
+
+# Eliminar noticias con ruido
+def es_ruido(texto):
+    texto = texto.lower()
+    palabras_ruido = [
+        'meta-analysis',
+        'systematic review',
+        'randomized',
+        'clinical',
+        'trial',
+        'disease',
+        'patients',
+        'treatment',
+        'psychology',
+        'medical',
+        'biology'
+    ]
+    return any(p in texto for p in palabras_ruido)
+
+df['relevante'] = df['title_clean'].apply(es_relevante)
+
+# Asignar cada noticia a cada empresa
+
+def asignar_empresa(texto):
+    texto = texto.lower()
+
+    if 'microsoft' in texto or 'msft' in texto:
+        return 'Microsoft'
+    elif 'openai' in texto or 'chatgpt' in texto or 'gpt' in texto:
+        return 'Microsoft'
+    elif 'google' in texto or 'goog' in texto or 'alphabet' in texto:
+        return 'Google'
+    elif 'amazon' in texto or 'amzn' in texto:
+        return 'Amazon'
+    elif 'meta ' in texto or 'facebook' in texto or 'instagram' in texto:
+        return 'Meta'
+    else:
+        return 'Other'
+
+#crear la columna
+df_empresas = df[
+    (df['relevante'] == True) &
+    (~df['title_clean'].apply(es_ruido))
+].copy()
+
+df_empresas['empresa'] = df_empresas['title_clean'].apply(asignar_empresa)
+
+# eliminar noticias que no se pueden asociar a una empresa
+df_empresas = df_empresas[df_empresas['empresa'] != 'Other'].reset_index(drop=True)
+
+
+# Filtrar por noticias de LLM
+def es_ia(texto):
+    texto = texto.lower()
+    
+    palabras_ia = [
+        'openai',
+        'chatgpt',
+        'gpt',
+        'llm',
+        'large language model',
+        'generative ai',
+        'artificial intelligence',
+        'ai model',
+        'deep learning'
+    ]
+    
+    return any(p in texto for p in palabras_ia)
+
+df_empresas['es_ia'] = df_empresas['title_clean'].apply(es_ia)
+
+df_llm = df_empresas[df_empresas['es_ia'] == True].copy().reset_index(drop=True)
+
+
+# 7. Comprobaciones finales
+
+print("DF original limpio:", df.shape)
+print("DF noticias por empresa:", df_empresas.shape)
+print("DF noticias LLM:", df_llm.shape)
+
+print("\nNoticias por empresa:")
+print(df_empresas['empresa'].value_counts())
