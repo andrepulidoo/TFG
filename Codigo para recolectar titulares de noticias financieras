@@ -1,53 +1,95 @@
+
+# Importar librerias
 import pandas as pd
 from pygooglenews import GoogleNews
 import datetime
+import trafilatura # Para sacar el cuerpo de la noticia de una web
+import time # Tiempo que tarda el script
+import subprocess
+subprocess.run(['pip', 'install', 'lxml[html_clean]', 'lxml_html_clean', '--upgrade'])
+
 gn = GoogleNews()
 
-def get_news(search):
+def fetch_article_body(url: str) -> str:
+    """Intenta extraer el cuerpo del artículo desde la URL."""
+    try:
+        downloaded = trafilatura.fetch_url(url)
+        if downloaded:
+            text = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
+            return text if text else ""
+    except Exception:
+        pass
+    return ""
+
+def get_news(search: str, fetch_body: bool = False) -> list[dict]:
     stories = []
-    start_date = datetime.date(2020,1,1)
-    end_date = datetime.date(2026,1,1)
-    delta = datetime.timedelta(days=30)
+    start_date = datetime.date(2020, 1, 1)
+    end_date = datetime.date(2025, 12, 31)  # Excluye 2026
+    delta = datetime.timedelta(days=15)     # Ventanas de 15 días
 
-    date_list = pd.date_range(start_date, end_date).tolist()
+    current = start_date
+    while current < end_date:
+        window_end = min(current + delta, end_date)
+        try:
+            result = gn.search(
+                search,
+                from_=current.strftime('%Y-%m-%d'),
+                to_=window_end.strftime('%Y-%m-%d')
+            )
+            for item in result.get('entries', []):
+                # Parseo robusto de fecha (varios formatos posibles)
+                published = None
+                for fmt in ('%a, %d %b %Y %X GMT', '%a, %d %b %Y %H:%M:%S %Z'):
+                    try:
+                        published = datetime.datetime.strptime(item.published, fmt)
+                        break
+                    except (ValueError, AttributeError):
+                        continue
 
-    for date in date_list[:-1:30]:
-        result = gn.search(
-            search,
-            from_=date.strftime('%Y-%m-%d'),
-            to_=(date+delta).strftime('%Y-%m-%d')
-        )
+                # Filtra noticias de 2026 en adelante por si acaso
+                if published and published.year >= 2026:
+                    continue
 
-        newsitem = result['entries']
+                story = {
+                    'title': item.get('title', ''),
+                    'published': published,
+                    'source': item.get('source', {}).get('title', '') if isinstance(item.get('source'), dict) else item.get('source', ''),
+                    'url': item.get('link', ''),
+                    'body': ''
+                }
 
-        for item in newsitem:
-            story = {
-                'title': item.title,
-                'published': datetime.datetime.strptime(
-                    item.published,
-                    '%a, %d %b %Y %X GMT'
-                )
-            }
-            stories.append(story)
+                if fetch_body and story['url']:
+                    story['body'] = fetch_article_body(story['url'])
+                    time.sleep(0.5)  # Respetar rate limits
+
+                stories.append(story)
+
+        except Exception as e:
+            print(f"Error en ventana {current} → {window_end}: {e}")
+
+        current = window_end
+        time.sleep(0.3)  # Pausa entre requests a Google News
 
     return stories
 
 
+# --- Ejecución ---
+# Pon fetch_body=True si quieres intentar extraer el cuerpo (más lento)
+FETCH_BODY = False
 
-df = pd.DataFrame(get_news('Microsoft OR MSFT'))
-df.to_csv('noticias_microsoft.csv', index=False)
+empresas = {
+    'microsoft': 'Microsoft OR MSFT',
+    'meta':      'Meta OR META',
+    'google':    'Google OR GOOG OR Alphabet',
+    'amazon':    'Amazon OR AMZN',
+}
 
-df1 = pd.DataFrame(get_news('Meta OR META'))
-df1.to_csv('noticias_meta.csv', index=False)
+for nombre, query in empresas.items():
+    print(f"Descargando noticias: {nombre}...")
+    df = pd.DataFrame(get_news(query, fetch_body=FETCH_BODY))
+    df = df.drop_duplicates(subset=['title', 'published'])
+    df = df.sort_values('published').reset_index(drop=True)
+    df.to_csv(f'noticias_{nombre}.csv', index=False)
+    print(f"  → {len(df)} noticias guardadas en noticias_{nombre}.csv")
 
-df2 = pd.DataFrame(get_news('Google OR GOOG'))
-df2.to_csv('noticias_google.csv', index=False)
-
-df3 = pd.DataFrame(get_news('Amazon OR AMZN'))
-df3.to_csv('noticias_amazon.csv', index=False)
-
-df4 = pd.DataFrame(get_news('OpenAI OR AI'))
-df4.to_csv('noticias_AI.csv', index=False)
-
-df5 = pd.DataFrame(get_news('LLM OR Large Language Model'))
-df5.to_csv('noticias_LLM.csv', index=False)
+print("¡Listo!")
