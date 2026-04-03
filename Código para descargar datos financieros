@@ -1,32 +1,50 @@
-import yfinance as yf
-import pandas as pd
 
-# -------------------------------
-empresas = {
-    'MSFT': 'Microsoft',
-    'GOOG': 'Google',
-    'META': 'Meta',
-    'AMZN': 'Amazon',
-    '^NDX': 'NASDAQ_100'
+import pandas as pd
+import numpy as np
+import yfinance as yf
+import os
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+# --- Tickers ---
+tickers = {
+    'microsoft': 'MSFT',
+    'meta':      'META',
+    'google':    'GOOG',
+    'amazon':    'AMZN',
+    'nasdaq':    '^NDX'
 }
 
-inicio = "2020-01-01"
-fin = "2025-12-31"
+start = '2020-01-01'
+end   = '2025-12-31'
 
-# -------------------------------
-# Descargar y guardar datos 
-# -------------------------------
-for ticker, nombre in empresas.items():
-    data = yf.download(ticker, start=inicio, end=fin)
+# --- Descarga ---
+print("Descargando datos financieros...")
+datos = {}
+for nombre, ticker in tickers.items():
+    df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False)
+    df = df[['Adj Close', 'Volume']].copy()
+    df.columns = ['adj_close', 'volume']
+    df.index.name = 'date'
+    datos[nombre] = df
+    print(f"  {nombre}: {len(df)} días descargados ({df.index.min().date()} → {df.index.max().date()})")
 
-    if data.empty:
-        print(f"No se pudieron descargar datos de {nombre}")
-        continue
+# --- Calcular retornos logarítmicos ---
+print("\nCalculando retornos...")
+for nombre in datos:
+    datos[nombre]['log_return'] = np.log(
+        datos[nombre]['adj_close'] / datos[nombre]['adj_close'].shift(1)
+    )
 
-    data.to_csv(f"prices_{nombre.lower()}.csv",
-    sep=';',
-    decimal=','
-)
-    print(f"Datos de {nombre} guardados como prices_{nombre.lower()}.csv")
+# --- Calcular excess return (retorno empresa - retorno Nasdaq) ---
+print("Calculando excess returns...")
+nasdaq_returns = datos['nasdaq']['log_return']
 
-print("\n Descarga individual completada.\n")
+for nombre in ['microsoft', 'meta', 'google', 'amazon']:
+    datos[nombre]['excess_return'] = datos[nombre]['log_return'] - nasdaq_returns
+
+# --- Guardar CSVs ---
+print("\nGuardando archivos...")
+for nombre, df in datos.items():
+    df.to_csv(f'financiero_{nombre}.csv')
+    print(f"  financiero_{nombre}.csv guardado ({len(df)} filas)")
