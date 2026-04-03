@@ -1,0 +1,177 @@
+# Analisis exploratorio
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+import pandas as pd
+import numpy as np
+import os
+from statsmodels.tsa.stattools import adfuller, kpss
+import warnings
+warnings.filterwarnings('ignore')
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+
+for empresa in empresas:
+    print(f"\n{'='*55}")
+    print(f"  {empresa.upper()}")
+    print(f"{'='*55}")
+
+    vader   = pd.read_csv(f'sentimiento_{empresa}_vader_daily.csv')
+    finbert = pd.read_csv(f'sentimiento_{empresa}_finbert_daily.csv')
+
+    vader['date']   = pd.to_datetime(vader['date'])
+    finbert['date'] = pd.to_datetime(finbert['date'])
+
+    # --- 1. FORMA DEL DATASET ---
+    print("\n[1] DIMENSIONES")
+    print(f"  VADER   : {vader.shape[0]} días | columnas: {vader.columns.tolist()}")
+    print(f"  FinBERT : {finbert.shape[0]} días | columnas: {finbert.columns.tolist()}")
+
+    # --- 2. RANGO TEMPORAL ---
+    print("\n[2] RANGO TEMPORAL")
+    print(f"  VADER   : {vader['date'].min().date()} → {vader['date'].max().date()}")
+    print(f"  FinBERT : {finbert['date'].min().date()} → {finbert['date'].max().date()}")
+
+    # --- 3. ESTADÍSTICOS DESCRIPTIVOS ---
+    print("\n[3] ESTADÍSTICOS DESCRIPTIVOS - vader_mean")
+    print(vader['vader_mean'].describe().round(4).to_string())
+
+    print("\n[3] ESTADÍSTICOS DESCRIPTIVOS - finbert_mean")
+    print(finbert['finbert_mean'].describe().round(4).to_string())
+
+    # --- 4. DISTRIBUCIÓN DE ETIQUETAS ---
+    print("\n[4] DISTRIBUCIÓN DE ETIQUETAS VADER (total noticias)")
+    total = vader['vader_positive'].sum() + vader['vader_negative'].sum() + vader['vader_neutral'].sum()
+    print(f"  Positivas : {vader['vader_positive'].sum():>6}  ({vader['vader_positive'].sum()/total*100:.1f}%)")
+    print(f"  Negativas : {vader['vader_negative'].sum():>6}  ({vader['vader_negative'].sum()/total*100:.1f}%)")
+    print(f"  Neutras   : {vader['vader_neutral'].sum():>6}  ({vader['vader_neutral'].sum()/total*100:.1f}%)")
+
+    print("\n[4] DISTRIBUCIÓN DE ETIQUETAS FinBERT (total noticias)")
+    total_f = finbert['finbert_positive'].sum() + finbert['finbert_negative'].sum() + finbert['finbert_neutral'].sum()
+    print(f"  Positivas : {finbert['finbert_positive'].sum():>6}  ({finbert['finbert_positive'].sum()/total_f*100:.1f}%)")
+    print(f"  Negativas : {finbert['finbert_negative'].sum():>6}  ({finbert['finbert_negative'].sum()/total_f*100:.1f}%)")
+    print(f"  Neutras   : {finbert['finbert_neutral'].sum():>6}  ({finbert['finbert_neutral'].sum()/total_f*100:.1f}%)")
+
+    # --- 5. NULOS EN SCORE DIARIO ---
+    print("\n[5] VALORES NULOS")
+    print(f"  VADER vader_mean nulos    : {vader['vader_mean'].isnull().sum()}")
+    print(f"  FinBERT finbert_mean nulos: {finbert['finbert_mean'].isnull().sum()}")
+
+    # --- 6. NOTICIAS POR DÍA ---
+    print("\n[6] NOTICIAS POR DÍA")
+    print(f"  VADER   - Media: {vader['n_noticias'].mean():.2f} | Máx: {vader['n_noticias'].max()} | Mín: {vader['n_noticias'].min()}")
+    print(f"  FinBERT - Media: {finbert['n_noticias'].mean():.2f} | Máx: {finbert['n_noticias'].max()} | Mín: {finbert['n_noticias'].min()}")
+
+    # --- 7. TEST DE ESTACIONARIEDAD ---
+    print("\n[7] TEST ESTACIONARIEDAD - VADER")
+    serie_v = vader['vader_mean'].dropna()
+    adf_v = adfuller(serie_v, autolag='AIC')
+    print(f"  ADF  stat={adf_v[0]:.4f}  p-value={adf_v[1]:.4f}  {'ESTACIONARIA ✓' if adf_v[1] < 0.05 else 'NO estacionaria ✗'}")
+    try:
+        kpss_v = kpss(serie_v, regression='c', nlags='auto')
+        print(f"  KPSS stat={kpss_v[0]:.4f}  p-value={kpss_v[1]:.4f}  {'ESTACIONARIA ✓' if kpss_v[1] > 0.05 else 'NO estacionaria ✗'}")
+    except:
+        print("  KPSS: no calculable")
+
+    print("\n[7] TEST ESTACIONARIEDAD - FinBERT")
+    serie_f = finbert['finbert_mean'].dropna()
+    adf_f = adfuller(serie_f, autolag='AIC')
+    print(f"  ADF  stat={adf_f[0]:.4f}  p-value={adf_f[1]:.4f}  {'ESTACIONARIA ✓' if adf_f[1] < 0.05 else 'NO estacionaria ✗'}")
+    try:
+        kpss_f = kpss(serie_f, regression='c', nlags='auto')
+        print(f"  KPSS stat={kpss_f[0]:.4f}  p-value={kpss_f[1]:.4f}  {'ESTACIONARIA ✓' if kpss_f[1] > 0.05 else 'NO estacionaria ✗'}")
+    except:
+        print("  KPSS: no calculable")
+
+print("\n\n¡Análisis exploratorio completado!")
+#%%
+# GRAFICOS
+
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 11
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+colores  = {
+    'microsoft': '#7EBA00',
+    'meta':      '#0073EB',
+    'google':    '#E22122',
+    'amazon':    '#FF9900'
+}
+
+# ── GRÁFICO 1: Evolución temporal ──
+fig, axes = plt.subplots(4, 2, figsize=(18, 20))
+fig.suptitle('Evolución del Sentimiento Diario por Empresa (2020–2025)',
+             fontsize=13, fontweight='bold', y=1.01)
+
+for i, empresa in enumerate(empresas):
+    vader   = pd.read_csv(f'sentimiento_{empresa}_vader_daily.csv')
+    finbert = pd.read_csv(f'sentimiento_{empresa}_finbert_daily.csv')
+    vader['date']   = pd.to_datetime(vader['date'])
+    finbert['date'] = pd.to_datetime(finbert['date'])
+    vader['mm30']   = vader['vader_mean'].rolling(30).mean()
+    finbert['mm30'] = finbert['finbert_mean'].rolling(30).mean()
+    color = colores[empresa]
+
+    for j, (df, col, modelo) in enumerate([
+        (vader,   'vader_mean',   'VADER'),
+        (finbert, 'finbert_mean', 'FinBERT')
+    ]):
+        ax = axes[i, j]
+        ax.fill_between(df['date'], df[col], alpha=0.15, color=color)
+        ax.plot(df['date'], df['mm30'], color=color, linewidth=1.5, label='Media móvil 30d')
+        ax.axhline(0, color='black', linewidth=0.7, linestyle='--')
+        ax.set_title(f'{empresa.upper()} — {modelo}', fontweight='bold', fontsize=11)
+        ax.set_ylabel('Score de sentimiento')
+        ax.set_xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2025-12-31'))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_sentimiento_evolucion.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Gráfico 1 guardado.")
+
+# ── GRÁFICO 2: Distribución de etiquetas ──
+fig, axes = plt.subplots(2, 4, figsize=(18, 8))
+fig.suptitle('Distribución de Etiquetas de Sentimiento: VADER vs FinBERT',
+             fontsize=13, fontweight='bold')
+
+datos = {
+    'microsoft': {'vader': [40.9, 10.7, 48.5], 'finbert': [19.5, 8.8, 71.7]},
+    'meta':      {'vader': [28.8, 21.5, 49.7], 'finbert': [9.0, 18.3, 72.7]},
+    'google':    {'vader': [34.0, 16.5, 49.5], 'finbert': [12.5, 14.9, 72.6]},
+    'amazon':    {'vader': [76.7, 14.7, 8.6],  'finbert': [13.1, 16.4, 70.5]},
+}
+
+etiquetas      = ['Positivo', 'Negativo', 'Neutro']
+colores_barras = ['#2ECC71', '#E74C3C', '#95A5A6']
+
+for i, empresa in enumerate(empresas):
+    for j, (modelo, vals) in enumerate([('VADER',   datos[empresa]['vader']),
+                                        ('FinBERT', datos[empresa]['finbert'])]):
+        ax = axes[j, i]
+        bars = ax.bar(etiquetas, vals, color=colores_barras, edgecolor='white', linewidth=0.8)
+        ax.set_title(f'{empresa.upper()} — {modelo}', fontweight='bold', fontsize=11)
+        ax.set_ylabel('Porcentaje (%)')
+        ax.set_ylim(0, 90)
+        for bar, val in zip(bars, vals):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                    f'{val}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        ax.grid(True, alpha=0.3, axis='y')
+
+plt.tight_layout()
+plt.savefig('fig_distribucion_etiquetas.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Gráfico 2 guardado.")
+
+print("\n¡Listo!")
