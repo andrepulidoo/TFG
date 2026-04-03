@@ -1,0 +1,33 @@
+import pandas as pd
+import numpy as np
+import os
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon', 'nasdaq']
+
+for empresa in empresas:
+    print(f"\n{'='*50}")
+    print(f"  {empresa.upper()}")
+    print(f"{'='*50}")
+    
+    df = pd.read_csv(f'financiero_{empresa}.csv', index_col='date', parse_dates=True)
+    
+    # Eliminar primera fila (NaN en retornos por el shift)
+    df = df.dropna()
+    
+    print(f"\n[1] DIMENSIONES: {df.shape[0]} días")
+    print(f"[2] NULOS:\n{df.isnull().sum()}")
+    print("\n[3] ESTADÍSTICOS - adj_close")
+    print(df['adj_close'].describe().round(4).to_string())
+    print("\n[3] ESTADÍSTICOS - log_return")
+    print(df['log_return'].describe().round(6).to_string())
+    
+    if empresa != 'nasdaq':
+        print("\n[3] ESTADÍSTICOS - excess_return")
+        print(df['excess_return'].describe().round(6).to_string())
+    
+    # Guardar limpio
+    df.to_csv(f'financiero_{empresa}_clean.csv')
+
+print("\n¡Limpieza completada!")
