@@ -1,0 +1,109 @@
+# GRAFICOS
+
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from statsmodels.tsa.stattools import adfuller, kpss
+import warnings
+warnings.filterwarnings('ignore')
+
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 11
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+colores  = {
+    'microsoft': '#7EBA00',
+    'meta':      '#0073EB',
+    'google':    '#E22122',
+    'amazon':    '#FF9900'
+}
+
+# Cargar datos
+datos = {}
+for e in empresas + ['nasdaq']:
+    df = pd.read_csv(f'financiero_{e}_clean.csv', index_col='date', parse_dates=True)
+    datos[e] = df
+
+# ── GRÁFICO 1: Evolución Adj Close ──
+fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+fig.suptitle('Evolución del Precio Ajustado de Cierre (2020–2025)', fontsize=13, fontweight='bold')
+axes = axes.flatten()
+
+for i, empresa in enumerate(empresas):
+    ax = axes[i]
+    ax.plot(datos[empresa].index, datos[empresa]['adj_close'],
+            color=colores[empresa], linewidth=1.5)
+    ax.set_title(empresa.upper(), fontweight='bold')
+    ax.set_ylabel('Precio (USD)')
+    ax.set_xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2025-12-31'))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_precio_adjclose.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Gráfico 1 guardado.")
+
+# ── GRÁFICO 2: Retornos logarítmicos y excess returns ──
+fig, axes = plt.subplots(4, 2, figsize=(16, 20))
+fig.suptitle('Retornos Logarítmicos y Excess Returns por Empresa (2020–2025)',
+             fontsize=13, fontweight='bold', y=1.01)
+
+for i, empresa in enumerate(empresas):
+    color = colores[empresa]
+    df = datos[empresa]
+
+    # Log return
+    ax = axes[i, 0]
+    ax.fill_between(df.index, df['log_return'], alpha=0.4, color=color)
+    ax.axhline(0, color='black', linewidth=0.7, linestyle='--')
+    ax.set_title(f'{empresa.upper()} — Retorno logarítmico', fontweight='bold')
+    ax.set_ylabel('Retorno')
+    ax.set_xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2025-12-31'))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    ax.grid(True, alpha=0.3)
+
+    # Excess return
+    ax = axes[i, 1]
+    ax.fill_between(df.index, df['excess_return'], alpha=0.4, color=color)
+    ax.axhline(0, color='black', linewidth=0.7, linestyle='--')
+    ax.set_title(f'{empresa.upper()} — Excess return', fontweight='bold')
+    ax.set_ylabel('Retorno')
+    ax.set_xlim(pd.Timestamp('2020-01-01'), pd.Timestamp('2025-12-31'))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_retornos.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Gráfico 2 guardado.")
+
+# ── ESTADÍSTICOS Y ESTACIONARIEDAD ──
+print("\n" + "="*55)
+print("TESTS DE ESTACIONARIEDAD")
+print("="*55)
+
+for empresa in empresas + ['nasdaq']:
+    print(f"\n{empresa.upper()}")
+    df = datos[empresa]
+
+    for col in ['log_return'] + (['excess_return'] if empresa != 'nasdaq' else []):
+        serie = df[col].dropna()
+        adf  = adfuller(serie, autolag='AIC')
+        try:
+            kpss_res = kpss(serie, regression='c', nlags='auto')
+            kpss_p = f"{kpss_res[1]:.4f}"
+            kpss_ok = 'ESTACIONARIA ✓' if kpss_res[1] > 0.05 else 'NO estacionaria ✗'
+        except:
+            kpss_p = 'n/a'
+            kpss_ok = 'n/a'
+        print(f"  {col}:")
+        print(f"    ADF  stat={adf[0]:.4f}  p={adf[1]:.4f}  {'ESTACIONARIA ✓' if adf[1]<0.05 else 'NO estacionaria ✗'}")
+        print(f"    KPSS stat={kpss_res[0]:.4f}  p={kpss_p}  {kpss_ok}")
+
+print("\n¡Listo!")
