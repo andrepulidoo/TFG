@@ -9,7 +9,7 @@ os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
 empresas = ['microsoft', 'meta', 'google', 'amazon']
 
 # Cargar Nasdaq para excess return
-nasdaq = pd.read_csv('financiero_nasdaq_clean.csv', index_col='date', parse_dates=True)
+nasdaq = pd.read_csv('financiero_nasdaq.csv', index_col='date', parse_dates=True)
 nasdaq['retorno_simple_nasdaq'] = nasdaq['adj_close'].pct_change() # (precio hoy - precio ayer) / precio ayer
 
 
@@ -33,7 +33,7 @@ def acumular_finde(serie):
 for empresa in empresas:
     print(empresa)
     # Datos financiero
-    fin = pd.read_csv(f'financiero_{empresa}_clean.csv',
+    fin = pd.read_csv(f'financiero_{empresa}.csv',
                       index_col='date', parse_dates=True)
     # Variables financieras
     fin['retorno_simple']   = fin['adj_close'].pct_change()
