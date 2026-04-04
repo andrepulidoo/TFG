@@ -6,7 +6,7 @@ import os
 
 os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
 
-# --- Tickers ---
+# Tickers
 tickers = {
     'microsoft': 'MSFT',
     'meta':      'META',
@@ -18,7 +18,7 @@ tickers = {
 start = '2020-01-01'
 end   = '2025-12-31'
 
-# --- Descarga ---
+# Descarga
 print("Descargando datos financieros...")
 datos = {}
 for nombre, ticker in tickers.items():
@@ -28,20 +28,6 @@ for nombre, ticker in tickers.items():
     df.index.name = 'date'
     datos[nombre] = df
     print(f"  {nombre}: {len(df)} días descargados ({df.index.min().date()} → {df.index.max().date()})")
-
-# --- Calcular retornos logarítmicos ---
-print("\nCalculando retornos...")
-for nombre in datos:
-    datos[nombre]['log_return'] = np.log(
-        datos[nombre]['adj_close'] / datos[nombre]['adj_close'].shift(1)
-    )
-
-# --- Calcular excess return (retorno empresa - retorno Nasdaq) ---
-print("Calculando excess returns...")
-nasdaq_returns = datos['nasdaq']['log_return']
-
-for nombre in ['microsoft', 'meta', 'google', 'amazon']:
-    datos[nombre]['excess_return'] = datos[nombre]['log_return'] - nasdaq_returns
 
 # --- Guardar CSVs ---
 print("\nGuardando archivos...")
