@@ -1,0 +1,92 @@
+# CODIGO PARA CREAR EL DATA SET FINAL
+
+import pandas as pd
+import numpy as np
+import os
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+
+# Cargar Nasdaq para excess return
+nasdaq = pd.read_csv('financiero_nasdaq_clean.csv', index_col='date', parse_dates=True)
+nasdaq['retorno_simple_nasdaq'] = nasdaq['adj_close'].pct_change() # (precio hoy - precio ayer) / precio ayer
+
+
+# Acumular el sentimiento del fin de semana
+def acumular_finde(serie):
+    serie_acum = serie.copy()
+    for fecha in serie.index:
+        if fecha.weekday() == 0:  # 0 = lunes
+            viernes = fecha - pd.Timedelta(days=3)
+            sabado  = fecha - pd.Timedelta(days=2)
+            domingo = fecha - pd.Timedelta(days=1)
+            vals = [] # se guarda el setimiento de esos dias
+            for dia in [viernes, sabado, domingo]:
+                if dia in serie.index and serie.loc[dia] != 0: # comprueba que hubo noticias esos dias, si no hubo n ose incluyen en el promedio
+                    vals.append(serie.loc[dia])
+            serie_acum.loc[fecha] = np.mean(vals) if vals else 0
+    return serie_acum
+
+# data set final
+
+for empresa in empresas:
+    print(empresa)
+    # Datos financiero
+    fin = pd.read_csv(f'financiero_{empresa}_clean.csv',
+                      index_col='date', parse_dates=True)
+    # Variables financieras
+    fin['retorno_simple']   = fin['adj_close'].pct_change()
+    fin['retorno_cuadrado'] = fin['retorno_simple'] ** 2
+    fin['excess_return']    = fin['retorno_simple'] - nasdaq['retorno_simple_nasdaq']
+    fin['volatilidad_20']   = fin['retorno_simple'].rolling(20).std()
+    #medias moviles
+    fin['mm7']              = fin['adj_close'].rolling(7).mean() 
+    fin['mm20']             = fin['adj_close'].rolling(20).mean()
+    fin['mm50']             = fin['adj_close'].rolling(50).mean()
+    #retorno acumulado
+    fin['retorno_acum_5']   = fin['adj_close'].pct_change(5)
+    fin['retorno_acum_10']  = fin['adj_close'].pct_change(10)
+   
+    # Sentimiento VADER
+    vader = pd.read_csv(f'sentimiento_{empresa}_vader_daily.csv')
+    vader['date'] = pd.to_datetime(vader['date'])
+    vader = vader.set_index('date')[['vader_mean']]
+    # Sentimiento FinBERT
+    finbert = pd.read_csv(f'sentimiento_{empresa}_finbert_daily.csv')
+    finbert['date'] = pd.to_datetime(finbert['date'])
+    finbert = finbert.set_index('date')[['finbert_mean']]
+    # Crear rango completo de fechas incluyendo fines de semana
+    fecha_inicio = min(vader.index.min(), finbert.index.min(), fin.index.min())
+    fecha_fin    = max(vader.index.max(), finbert.index.max(), fin.index.max())
+    rango_completo = pd.date_range(start=fecha_inicio, end=fecha_fin, freq='D')
+    # Incluir todos los días y los que no hay rellenar con 0
+    vader_full   = vader.reindex(rango_completo).fillna(0)
+    finbert_full = finbert.reindex(rango_completo).fillna(0)
+    # Acumular sentimiento de viernes, sábado y domingo en el lunes
+    vader_full['vader_mean']     = acumular_finde(vader_full['vader_mean'])
+    finbert_full['finbert_mean'] = acumular_finde(finbert_full['finbert_mean'])
+    # Merge (solo dias de mercado)
+    df = fin.join(vader_full[['vader_mean']],    how='left')
+    df = df.join(finbert_full[['finbert_mean']], how='left')
+    # Días sin noticias → neutro
+    df['vader_mean']   = df['vader_mean'].fillna(0)
+    df['finbert_mean'] = df['finbert_mean'].fillna(0)
+    # Lag del sentimiento 
+    df['vader_lag1']   = df['vader_mean'].shift(1)
+    df['finbert_lag1'] = df['finbert_mean'].shift(1)
+
+    # Eliminar columnas que ya no necesitamos
+    df = df.drop(columns=['log_return', 'vader_mean', 'finbert_mean'])
+
+    # Eliminar filas con NaN (por rolling y lags)
+    n_antes = len(df)
+    df = df.dropna()
+    n_despues = len(df)
+
+    print(f"  Filas: {n_despues} (eliminadas por NaN: {n_antes - n_despues})")
+    print(f"  Período: {df.index.min().date()} → {df.index.max().date()}")
+    print(f"  Columnas: {df.columns.tolist()}")
+    print(f"  Nulos: {df.isnull().sum().sum()}")
+
+    df.to_csv(f'dataset_{empresa}.csv')
