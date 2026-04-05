@@ -1,0 +1,109 @@
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
+
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 16
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+nombres  = ['Microsoft', 'Meta', 'Alphabet', 'Amazon']
+colores  = {
+    'microsoft': '#006AD7',
+    'meta':      '#21277B',
+    'google':    '#9AD9EA',
+    'amazon':    '#5F83B1'
+}
+
+datos = {}
+for empresa in empresas:
+    datos[empresa] = pd.read_csv(f'dataset_{empresa}.csv',
+                                  index_col='date', parse_dates=True)
+
+# FIGURA 3 'Evolución del Precio Ajustado de Cierre por Empresa (2020–2025)'
+fig, ax = plt.subplots(figsize=(16, 6))
+for empresa, nombre in zip(empresas, nombres):
+    ax.plot(datos[empresa].index, datos[empresa]['adj_close'],
+            color=colores[empresa], linewidth=1.5, label=nombre)
+ax.set_title('Evolución del Precio Ajustado de Cierre por Empresa (2020–2025)',
+             fontweight='bold', fontsize=18)
+ax.set_ylabel('Precio (USD)')
+ax.set_xlim(pd.Timestamp('2020-03-16'), pd.Timestamp('2025-12-30'))
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+ax.legend(fontsize=16)
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig('fig_precio.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Gráfico guardado")
+
+
+
+# FIGURA 4 'Distribución del Exceso de Retorno por Empresa (en %)'
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Distribución del Exceso de Retorno por Empresa (en %)',
+             fontweight='bold', fontsize=18)
+axes = axes.flatten()
+
+for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
+    df    = datos[empresa]
+    color = colores[empresa]
+    axes[i].hist(df['excess_return'], bins=80, color=color,
+                 alpha=0.8, edgecolor='none')
+    axes[i].axvline(df['excess_return'].mean(), color='black',
+                    linewidth=1.5, linestyle='--',
+                    label=f"μ={df['excess_return'].mean():.2f}%")
+    axes[i].axvline(0, color='gray', linewidth=0.8, linestyle=':')
+    axes[i].set_title(nombre, fontweight='bold')
+    axes[i].set_xlabel('Exceso de Retorno (%)')
+    axes[i].set_ylabel('Frecuencia')
+    axes[i].legend(fontsize=16)
+    axes[i].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_distribucion.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("GráficO guardado")
+
+#%%
+
+# ESTADISTICOS Y ESTACIONARIEDAD
+
+import pandas as pd
+import numpy as np
+import os
+from statsmodels.tsa.stattools import adfuller, kpss
+import warnings
+warnings.filterwarnings('ignore')
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+
+for empresa in empresas:
+    print(f"  {empresa.upper()}")
+    
+    df = pd.read_csv(f'dataset_{empresa}.csv', index_col='date', parse_dates=True)
+    
+    # Estadísticos descriptivos
+    print("DESCRIPTIVOS")
+    print(df.describe().round(4).to_string())
+    
+    # Estacionariedad
+    print("ESTACIONARIEDAD")
+    for col in ['adj_close', 'excess_return', 'retorno_simple', 
+                'volatilidad_20']:
+        serie = df[col].dropna()
+        adf = adfuller(serie, autolag='AIC')
+        try:
+            kpss_res = kpss(serie, regression='c', nlags='auto')
+            kpss_p   = f"{kpss_res[1]:.4f}"
+        except:
+            kpss_p  = 'n/a'
+            kpss_ok = 'n/a'
+        print(f"  {col}: ADF p={adf[1]:.4f}  | KPSS p={kpss_p}")
