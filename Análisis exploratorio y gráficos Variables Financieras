@@ -107,3 +107,56 @@ for empresa in empresas:
             kpss_p  = 'n/a'
             kpss_ok = 'n/a'
         print(f"  {col}: ADF p={adf[1]:.4f}  | KPSS p={kpss_p}")
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+import warnings
+warnings.filterwarnings('ignore')
+
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 16
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+nombres  = ['Microsoft', 'Meta', 'Alphabet', 'Amazon']
+colores  = {
+    'microsoft': '#006AD7',
+    'meta':      '#21277B',
+    'google':    '#9AD9EA',
+    'amazon':    '#5F83B1'
+}
+
+#%%
+#FAC y FACP del Excess Retur
+fig, axes = plt.subplots(4, 2, figsize=(16, 20))
+fig.suptitle('FAC y FACP del Excess Return por Empresa',
+             fontsize=16, fontweight='bold', y=1.01)
+
+for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
+    df    = pd.read_csv(f'dataset_{empresa}.csv', index_col='date', parse_dates=True)
+    serie = df['excess_return'].dropna()
+    color = colores[empresa]
+
+    # FAC
+    plot_acf(serie, lags=40, ax=axes[i, 0], color=color,
+             vlines_kwargs={'colors': color}, alpha=0.05)
+    axes[i, 0].set_title(f'{nombre} — FAC (Excess Return)', fontweight='bold')
+    axes[i, 0].set_xlabel('Lag')
+    axes[i, 0].set_ylabel('Autocorrelación')
+    axes[i, 0].grid(True, alpha=0.3)
+
+    # FACP
+    plot_pacf(serie, lags=40, ax=axes[i, 1], color=color,
+              vlines_kwargs={'colors': color}, alpha=0.05, method='ywm')
+    axes[i, 1].set_title(f'{nombre} — FACP (Excess Return)', fontweight='bold')
+    axes[i, 1].set_xlabel('Lag')
+    axes[i, 1].set_ylabel('Autocorrelación parcial')
+    axes[i, 1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_fac_facp_excess.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Guardado")
