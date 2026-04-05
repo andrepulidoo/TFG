@@ -1,6 +1,6 @@
 # %%
 
-# Analisis exploratorio
+# ANALISIS EXPLORATORIO
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 warnings.filterwarnings('ignore')
@@ -20,29 +20,29 @@ for empresa in empresas:
     vader['date'] = pd.to_datetime(vader['date'])
     finbert['date'] = pd.to_datetime(finbert['date'])
 
-    # --- 1. FORMA DEL DATASET ---
-    print("\n[1] DIMENSIONES")
+    # FORMA DEL DATASET
+    print("DIMENSIONES")
     print(
         f"  VADER   : {vader.shape[0]} días | columnas: {vader.columns.tolist()}")
     print(
         f"  FinBERT : {finbert.shape[0]} días | columnas: {finbert.columns.tolist()}")
 
-    # --- 2. RANGO TEMPORAL ---
-    print("\n[2] RANGO TEMPORAL")
+    # RANGO TEMPORAL
+    print("RANGO TEMPORAL")
     print(
         f"  VADER   : {vader['date'].min().date()} → {vader['date'].max().date()}")
     print(
         f"  FinBERT : {finbert['date'].min().date()} → {finbert['date'].max().date()}")
 
-    # --- 3. ESTADÍSTICOS DESCRIPTIVOS ---
-    print("\n[3] ESTADÍSTICOS DESCRIPTIVOS - vader_mean")
+    # ESTADÍSTICOS DESCRIPTIVOS
+    print(ESTADÍSTICOS DESCRIPTIVOS - vader_mean")
     print(vader['vader_mean'].describe().round(4).to_string())
 
-    print("\n[3] ESTADÍSTICOS DESCRIPTIVOS - finbert_mean")
+    print("ESTADÍSTICOS DESCRIPTIVOS - finbert_mean")
     print(finbert['finbert_mean'].describe().round(4).to_string())
 
-    # --- 4. DISTRIBUCIÓN DE ETIQUETAS ---
-    print("\n[4] DISTRIBUCIÓN DE ETIQUETAS VADER (total noticias)")
+    # DISTRIBUCIÓN DE ETIQUETAS
+    print("DISTRIBUCIÓN DE ETIQUETAS VADER (total noticias)")
     total = vader['vader_positive'].sum(
     ) + vader['vader_negative'].sum() + vader['vader_neutral'].sum()
     print(
@@ -52,7 +52,7 @@ for empresa in empresas:
     print(
         f"  Neutras   : {vader['vader_neutral'].sum():>6}  ({vader['vader_neutral'].sum()/total*100:.1f}%)")
 
-    print("\n[4] DISTRIBUCIÓN DE ETIQUETAS FinBERT (total noticias)")
+    print("DISTRIBUCIÓN DE ETIQUETAS FinBERT (total noticias)")
     total_f = finbert['finbert_positive'].sum(
     ) + finbert['finbert_negative'].sum() + finbert['finbert_neutral'].sum()
     print(
@@ -62,24 +62,22 @@ for empresa in empresas:
     print(
         f"  Neutras   : {finbert['finbert_neutral'].sum():>6}  ({finbert['finbert_neutral'].sum()/total_f*100:.1f}%)")
 
-    # --- 5. NULOS EN SCORE DIARIO ---
-    print("\n[5] VALORES NULOS")
+    # NULOS EN SCORE DIARIO
+    print("VALORES NULOS")
     print(
         f"  VADER vader_mean nulos    : {vader['vader_mean'].isnull().sum()}")
     print(
         f"  FinBERT finbert_mean nulos: {finbert['finbert_mean'].isnull().sum()}")
 
-    # --- 6. NOTICIAS POR DÍA ---
-    print("\n[6] NOTICIAS POR DÍA")
+    # NOTICIAS POR DÍA
+    print("NOTICIAS POR DÍA")
     print(
         f"  VADER   - Media: {vader['n_noticias'].mean():.2f} | Máx: {vader['n_noticias'].max()} | Mín: {vader['n_noticias'].min()}")
     print(
         f"  FinBERT - Media: {finbert['n_noticias'].mean():.2f} | Máx: {finbert['n_noticias'].max()} | Mín: {finbert['n_noticias'].min()}")
 
 
-
-
-# %%+
+# %%
 
 # GRAFICOS
 import os
@@ -103,7 +101,50 @@ colores  = {
     'amazon':    '#5F83B1'
 }
 
-# ── GRÁFICO 1: Evolución sentimiento (VADER y FinBERT juntos) ──
+
+# FIGURA 1 - 'Distribución de Etiquetas de Sentimiento por Empresa'
+datos_etiquetas = {
+    'microsoft': {'vader': [40.9, 10.7, 48.5], 'finbert': [19.5, 8.8, 71.7]},
+    'meta':      {'vader': [28.8, 21.5, 49.7], 'finbert': [9.0, 18.3, 72.7]},
+    'google':    {'vader': [34.0, 16.5, 49.5], 'finbert': [12.5, 14.9, 72.6]},
+    'amazon':    {'vader': [76.7, 14.7, 8.6],  'finbert': [13.1, 16.4, 70.5]},
+}
+
+etiquetas = ['Positivo', 'Negativo', 'Neutro']
+x = np.arange(len(etiquetas))
+width = 0.2
+
+fig, axes = plt.subplots(2, 1, figsize=(12, 10))
+fig.suptitle('Distribución de Etiquetas de Sentimiento por Empresa',
+             fontsize=16, fontweight='bold')
+
+for ax, modelo in zip(axes, ['vader', 'finbert']):
+    for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
+        vals = datos_etiquetas[empresa][modelo]
+        bars = ax.bar(x + i*width, vals, width,
+                      label=nombre, color=colores[empresa],
+                      alpha=0.85, edgecolor='white')
+        for bar, val in zip(bars, vals):
+            ax.text(bar.get_x() + bar.get_width()/2,
+                    bar.get_height() + 0.5,
+                    f'{val}%', ha='center', va='bottom',
+                    fontsize=14, fontweight='bold')
+
+    ax.set_title(f'{"VADER" if modelo == "vader" else "FinBERT"}',
+                 fontweight='bold', fontsize=14)
+    ax.set_ylabel('Porcentaje (%)')
+    ax.set_ylim(0, 90)
+    ax.set_xticks(x + width*1.5)
+    ax.set_xticklabels(etiquetas)
+    ax.legend(fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+
+plt.tight_layout()
+plt.savefig('fig_distribucion_etiquetas.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Gráfico guardado")
+
+# FIGURA 2 - 'Evolución del Sentimiento Diario por Empresa (Media Móvil 30 días)'
 
 plt.rcParams['font.family'] = 'Times New Roman'
 plt.rcParams['font.size'] = 16
@@ -155,54 +196,12 @@ for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
 plt.tight_layout()
 plt.savefig('fig_sentimiento_evolucion.png', dpi=150, bbox_inches='tight')
 plt.show()
-print("Gráfico guardado.")
-# ── GRÁFICO 2: Distribución etiquetas barras agrupadas ──
-datos_etiquetas = {
-    'microsoft': {'vader': [40.9, 10.7, 48.5], 'finbert': [19.5, 8.8, 71.7]},
-    'meta':      {'vader': [28.8, 21.5, 49.7], 'finbert': [9.0, 18.3, 72.7]},
-    'google':    {'vader': [34.0, 16.5, 49.5], 'finbert': [12.5, 14.9, 72.6]},
-    'amazon':    {'vader': [76.7, 14.7, 8.6],  'finbert': [13.1, 16.4, 70.5]},
-}
+print("Gráfico guardado")
 
-etiquetas = ['Positivo', 'Negativo', 'Neutro']
-x = np.arange(len(etiquetas))
-width = 0.2
-
-fig, axes = plt.subplots(2, 1, figsize=(12, 10))
-fig.suptitle('Distribución de Etiquetas de Sentimiento por Empresa',
-             fontsize=16, fontweight='bold')
-
-for ax, modelo in zip(axes, ['vader', 'finbert']):
-    for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
-        vals = datos_etiquetas[empresa][modelo]
-        bars = ax.bar(x + i*width, vals, width,
-                      label=nombre, color=colores[empresa],
-                      alpha=0.85, edgecolor='white')
-        for bar, val in zip(bars, vals):
-            ax.text(bar.get_x() + bar.get_width()/2,
-                    bar.get_height() + 0.5,
-                    f'{val}%', ha='center', va='bottom',
-                    fontsize=14, fontweight='bold')
-
-    ax.set_title(f'{"VADER" if modelo == "vader" else "FinBERT"}',
-                 fontweight='bold', fontsize=14)
-    ax.set_ylabel('Porcentaje (%)')
-    ax.set_ylim(0, 90)
-    ax.set_xticks(x + width*1.5)
-    ax.set_xticklabels(etiquetas)
-    ax.legend(fontsize=14)
-    ax.grid(True, alpha=0.3, axis='y')
-
-plt.tight_layout()
-plt.savefig('fig_distribucion_etiquetas.png', dpi=150, bbox_inches='tight')
-plt.show()
-print("Gráfico 2 guardado.")
-
-print("\n¡Listo!")
 # %%
- #  TEST DE ESTACIONARIEDAD
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
+#  TEST DE ESTACIONARIEDAD
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
 
@@ -237,3 +236,86 @@ for empresa in empresas:
         print(f"  KPSS stat={kpss_f[0]:.4f}  p-value={kpss_f[1]:.4f}")
      except:
         print("no calculable")
+
+#%%
+
+# FAC Y FACP
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+import warnings
+warnings.filterwarnings('ignore')
+
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 16
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+nombres  = ['Microsoft', 'Meta', 'Alphabet', 'Amazon']
+colores  = {
+    'microsoft': '#006AD7',
+    'meta':      '#21277B',
+    'google':    '#9AD9EA',
+    'amazon':    '#5F83B1'
+}
+
+# VADER
+fig, axes = plt.subplots(4, 2, figsize=(16, 20))
+fig.suptitle('FAC y FACP del Sentimiento (VADER) por Empresa',
+             fontsize=16, fontweight='bold', y=1.01)
+
+for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
+    df    = pd.read_csv(f'dataset_{empresa}.csv', index_col='date', parse_dates=True)
+    serie = df['vader_lag1'].dropna()
+    color = colores[empresa]
+
+    plot_acf(serie, lags=40, ax=axes[i, 0], color=color,
+             vlines_kwargs={'colors': color}, alpha=0.05)
+    axes[i, 0].set_title(f'{nombre} — FAC (VADER)', fontweight='bold')
+    axes[i, 0].set_xlabel('Lag')
+    axes[i, 0].set_ylabel('Autocorrelación')
+    axes[i, 0].grid(True, alpha=0.3)
+
+    plot_pacf(serie, lags=40, ax=axes[i, 1], color=color,
+              vlines_kwargs={'colors': color}, alpha=0.05, method='ywm')
+    axes[i, 1].set_title(f'{nombre} — FACP (VADER)', fontweight='bold')
+    axes[i, 1].set_xlabel('Lag')
+    axes[i, 1].set_ylabel('Autocorrelación parcial')
+    axes[i, 1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_fac_facp_vader.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("FAC/FACP VADER guardado.")
+
+# FinBERT
+fig, axes = plt.subplots(4, 2, figsize=(16, 20))
+fig.suptitle('FAC y FACP del Sentimiento (FinBERT) por Empresa',
+             fontsize=16, fontweight='bold', y=1.01)
+
+for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
+    df    = pd.read_csv(f'dataset_{empresa}.csv', index_col='date', parse_dates=True)
+    serie = df['finbert_lag1'].dropna()
+    color = colores[empresa]
+
+    plot_acf(serie, lags=40, ax=axes[i, 0], color=color,
+             vlines_kwargs={'colors': color}, alpha=0.05)
+    axes[i, 0].set_title(f'{nombre} — FAC (FinBERT)', fontweight='bold')
+    axes[i, 0].set_xlabel('Lag')
+    axes[i, 0].set_ylabel('Autocorrelación')
+    axes[i, 0].grid(True, alpha=0.3)
+
+    plot_pacf(serie, lags=40, ax=axes[i, 1], color=color,
+              vlines_kwargs={'colors': color}, alpha=0.05, method='ywm')
+    axes[i, 1].set_title(f'{nombre} — FACP (FinBERT)', fontweight='bold')
+    axes[i, 1].set_xlabel('Lag')
+    axes[i, 1].set_ylabel('Autocorrelación parcial')
+    axes[i, 1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_fac_facp_finbert.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("FAC/FACP FinBERT guardado."))
