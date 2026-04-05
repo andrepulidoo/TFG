@@ -1,0 +1,150 @@
+
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
+
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.size'] = 16
+
+os.chdir(r'C:/Users/andre/OneDrive/Documentos/TFG')
+
+empresas = ['microsoft', 'meta', 'google', 'amazon']
+nombres  = ['Microsoft', 'Meta', 'Alphabet', 'Amazon']
+colores  = {
+    'microsoft': '#006AD7',
+    'meta':      '#21277B',
+    'google':    '#9AD9EA',
+    'amazon':    '#5F83B1'
+}
+
+datos = {}
+for empresa in empresas:
+    datos[empresa] = pd.read_csv(f'dataset_{empresa}.csv',
+                                  index_col='date', parse_dates=True)
+# FIGURA 5 'Matriz de Correlación'
+
+col_labels = {
+    'excess_return':   'Exc. Ret.',
+    'volume':          'Volumen',
+    'retorno_simple':  'Ret. Simple',
+    'volatilidad_20':  'Vol. 20d',
+    'mm50':            'MM50',
+    'retorno_acum_5':  'Ret. 5d',
+    'retorno_acum_10': 'Ret. 10d',
+    'vader_lag1':      'VADER',
+    'finbert_lag1':    'FinBERT'
+}
+
+company_colors = {
+    'microsoft': '#006AD7',
+    'meta':      '#21277B',
+    'google':    '#9AD9EA',
+    'amazon':    '#5F83B1'
+}
+
+cols_selected = list(col_labels.keys())
+
+for empresa, nombre in zip(empresas, nombres):
+    df_temp = datos[empresa][cols_selected].copy()
+    df_temp.columns = [col_labels[c] for c in cols_selected]
+    corr = df_temp.corr()
+
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+
+    base_color = company_colors[empresa]
+    cmap_full = sns.blend_palette(['#B695C0', '#FFFFFF', base_color], as_cmap=True)
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+    sns.heatmap(
+        corr, mask=mask, annot=True, fmt='.2f',
+        cmap=cmap_full,
+        linewidths=0.5, ax=ax,
+        annot_kws={'size': 16},
+        vmin=-1, vmax=1, center=0,
+        cbar_kws={'shrink': 0.8}
+    )
+    ax.set_title(f'Matriz de Correlación — {nombre}', fontweight='bold',
+                 fontsize=16, color='#000000', pad=15)
+    ax.tick_params(axis='x', rotation=45, labelsize=14)
+    ax.tick_params(axis='y', rotation=0,  labelsize=14)
+
+    plt.tight_layout()
+    plt.savefig(f'fig_correlacion_{empresa}.png', dpi=150, bbox_inches='tight')
+    plt.show()
+    print(f"Gráfico guardado: fig_correlacion_{empresa}.png")
+    
+# FIGURA 6 'Relación entre Sentimiento y Exceso de Retorno Diario'
+datos = {}
+for empresa in empresas:
+    datos[empresa] = pd.read_csv(f'dataset_{empresa}.csv',
+                                  index_col='date', parse_dates=True)
+
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+fig.suptitle('Relación entre Sentimiento y Exceso de Retorno Diario',
+             fontweight='bold', fontsize=16)
+
+for ax, (col, label) in zip(axes, [
+    ('vader_lag1',   'Score VADER (t-1)'),
+    ('finbert_lag1', 'Score FinBERT (t-1)')
+]):
+    for empresa, nombre in zip(empresas, nombres):
+        df = datos[empresa]
+        ax.scatter(df[col], df['excess_return'],
+                   alpha=0.15, s=8, color=colores[empresa], label=nombre)
+
+    ax.axhline(0, color='black', linewidth=0.8, linestyle='--')
+    ax.axvline(0, color='black', linewidth=0.8, linestyle='--')
+    ax.set_xlabel(label)
+    ax.set_ylabel('Exceso de Retorno (%)')
+    ax.set_title(f'{"VADER" if "vader" in col else "FinBERT"} vs Exceso de Retorno',
+                 fontweight='bold')
+    ax.legend(fontsize=16, markerscale=3)
+    ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_scatter.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+# ANEXO 1 'Correlación Cruzada: Sentimiento vs Exceso de Retorno por Lag'
+resultados_lag = {}
+for empresa in empresas:
+    df = datos[empresa]
+    resultados_lag[empresa] = {'vader': [], 'finbert': [], 'lags': []}
+    for lag in range(0, 8):
+        vader_s   = df['vader_lag1'].shift(lag)
+        finbert_s = df['finbert_lag1'].shift(lag)
+        resultados_lag[empresa]['vader'].append(
+            df['excess_return'].corr(vader_s))
+        resultados_lag[empresa]['finbert'].append(
+            df['excess_return'].corr(finbert_s))
+        resultados_lag[empresa]['lags'].append(lag)
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Correlación Cruzada: Sentimiento vs Exceso de Retorno por Lag',
+             fontweight='bold', fontsize=16)
+axes = axes.flatten()
+
+for i, (empresa, nombre) in enumerate(zip(empresas, nombres)):
+    ax    = axes[i]
+    color = colores[empresa]
+    lags  = [f"t-{l+1}" for l in resultados_lag[empresa]['lags']]
+    ax.plot(lags, resultados_lag[empresa]['vader'],
+            color=color, linewidth=2, marker='o', label='VADER')
+    ax.plot(lags, resultados_lag[empresa]['finbert'],
+            color=color, linewidth=2, marker='s', linestyle='--',
+            alpha=0.7, label='FinBERT')
+    ax.axhline(0, color='black', linewidth=0.7, linestyle='--')
+    ax.set_title(nombre, fontweight='bold')
+    ax.set_ylabel('Correlación de Pearson')
+    ax.set_xlabel('Lag')
+    ax.legend(fontsize=16)
+    ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('fig_anexo_correlacion_cruzada.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("Guardado")
